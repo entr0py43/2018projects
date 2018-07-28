@@ -18,10 +18,10 @@ Background:  Decided to participate in a 36 hour 'over the weekend' data science
 
 
 ## Problem Statement   
-Basically a two-parter. **Part A**  You, a data scientist at an insurance company, are trying to predict the probability of renewal (standard 'churn' problem, logistic regression).  The interesting part was **Part B** the optimization:  you can spend extra to have the agent give extra attention to clients, and thereby increase their probability of renewal. BUT this relationship was not linear. 
+Basically a two-parter. **Part A**  You, a data scientist at an insurance company, are trying to predict the probability of policy renewal for each customer (standard 'churn' problem, logistic regression).  The interesting part was **Part B** the optimization, and my main focus here.  You can spend extra (**"Incentives**) to have agents pay extra attention to clients, and thereby gain an **Increase in Probability** of renewal. BUT, this relationship was not linear. 
 
 ```{r, message=F}
-pacman::p_load(tidyverse, caret, plotROC, pROC, DMwR2, plotly)
+pacman::p_load(tidyverse, plotROC, pROC, DMwR2, plotly)
 fun.3 <- function(x) .2*(1-exp(-2*(1-exp(-x/400))))
 p <- ggplot(data=data.frame(x=0), mapping = aes(x=x))
 q <- p + stat_function(fun = fun.3)+xlim(0,1500)+ylim(0,.175)+
@@ -33,19 +33,20 @@ ggplotly(q)
   
 **The goal** is to maximize Total Net Revenue, defined by:  the updated Probability, P(baseline + incentive bump) *times* the Premium on the policy *minus* whatever you spent on Incentives (summed across all rows).  
 
-**My approach:**  Work out the relationships between variables using function approximation.  If/when I come across a more elegant/correct way to do the optimization, I'll update this page or write a part 2.      
+**My approach:**  Work out the relationships between variables using function approximation.  *If/when I come across a more elegant/correct way to do the optimization, I'll update this page or write a part 2.  *    
 
 ### Considerations
 
-* Probability ranges from 0-1.  If a customer is predicted to have a high probability of renewing their policy (say ~0.99), you cannot incentivize their policy to combined probability > 1.  In other words, *the maximum renvenue per policy, before subtracting incentives, is the Premium*  
-* You'll want to maximize those policies that already have high baseline P(renewal). Because it doesn't cost very much (curve is steepest closer to 0).  That seems silly and probably not something you'd do in real life, BUT the problem did not account for compensation of the agent, so **your only goal is to maximize return according to the formula given.**  
-* The smaller the premium, the smaller the 'upper limit' will be on incentives, since the incentive cost-per-%-improvement will provide diminishing returns as the curve flattens out.  The optimium ROI will depend on the premium amount (I'll cover in a minute)
+* Probability ranges from 0-1.  If a customer is predicted to have a high probability of renewing their policy (say ~0.99), you cannot incentivize their policy to a combined probability > 1.  In other words, **the maximum revenue per policy, before subtracting incentives, is the Premium.**   
+* You'll want to maximize those policies that already have high baseline P(renewal) to 1, because small Improvements don't cost very much (curve is steepest closer to 0).  That seems silly and probably not something you'd do in real life, BUT the problem did not account for compensation of the agent, so **your only goal is to maximize return according to the formula given.**  
+* The smaller the premium, the smaller the 'upper limit' will be on incentives, since the incentive cost-per-%-improvement will provide diminishing returns as the curve flattens out.  **The optimium ROI will depend on the premium amount.** (I'll cover in a minute)
 
 ## Scoring Metric  
-I'll ignore for now, since the dataset isn't public. Your submission included P(baseline) and incentive per policy in the test set.  Scoring was a weighted average that favored the AUC (of the ROC) for your Part A solution (70% of score), and the other ~30% of score was the total net revenue.  
+I'll ignore for now, since the dataset isn't public, and there is no longer a way to check your score with their metric.  Scoring was a weighted average that favored the AUC (of the ROC) for your Part A solution (70% of score), and the other ~30% of score was calculated from your total net revenue.  
 
 ## EDA + Model
-A simple logisitc regression on untransformed variables performed fairly well in this case.  Since optimizing a binary classifier wasn't what I was interested in learning, and is not the focus of this post, I'll skim over and show you some quick code for getting Part A out of the way.  The `DMwR2` package in R makes kNN imputation quite easy. There were a handful in both the training and test sets that needed to be addressed.
+A simple logistic regression on untransformed variables performed fairly well in this case.  (predictor variables included: age, number of premiums paid on time/late, income, and underwriter/credit score).  
+The classifier isn't the focus here, so I'll just show the quick and dirty code for Part A.  The `DMwR2` package in R makes kNN imputation quite easy - as there were a handful of NAs in both the training and test sets.
 ```{r, cache=T}
 train <- read.csv('train.csv')
 trainCC <- knnImputation(train[,-c(1)])
@@ -56,15 +57,15 @@ ggplot(trainCC, aes(d=renewal, m = lr0pred))+geom_roc()
 auc <- roc(trainCC$renewal, lr0pred); auc # on training
 ```
 
-So, that's enough for now, I'll make a companion post exploring how to optimize the binary classifier model. But since the best AUC I saw was ~0.85, I call that darn good for a first-pass.  FWIW, feature engineering did little to enhance the model, according to several of the top-ranked participants, and my own fiddling (quite frustrating!).
+Sometime soon I'll make a companion post exploring how to optimize the binary classifier model. But since the best AUC I saw was ~0.85, I call that darn good for a first-pass.  FWIW, feature engineering/transforms did little to enhance the model, according to several of the top-ranked participants, and my own fiddling (quite frustrating!).
 
 
 ## Optimization Strategy  
-The first step was to figure out the optimum 'ROI' for Incentives, across the range of policy premiums.  There are two ways to do this, the smart way is to plot this equation, where z = ROI, x = Incentives, and y = Premium.  It gives you a 3d surface - find the equation that defines the maximum for each x,y and you're all set. 
+The first step was to figure out the optimum 'ROI' for Incentives, across the range of policy premiums.  The smart way is to plot the equation, where z = ROI, x = Incentives, and y = Premium.  It gives you a 3d surface - find the equation that defines the maximum for each x,y and you're all set. 
 ```{r, eval=F}
 fun.3d <- function(x,y) (.2*(1-exp(-2*(1-exp(-x/400))))*y) - x
 ```
-Except I don't have the math chops to do that.  It sure is pretty though...
+Except I don't have the math skills to make that happen. The plot sure is pretty though...
 
 ```{r}
 incentives <- seq(0,1000,10)
@@ -77,11 +78,11 @@ plot_ly(x=~incentives,
 ```
 
 
-So here's what I did instead:  Turned to my trusty friend Excel, and plotted a poor man's 3d surface.  We already know the relationship between Incentives and Increase in Probability, so we can multiply the latter by each premium amount for a sensible range of Incentive values, and deduct the cost to calculate the ROI (see below).
+What I did instead was turned to (old faithful) Excel, and plotted a poor man's 3d surface.  We already know the relationship between `Incentive` and `Increase in Probability`, so we can multiply the latter by a range of premium amounts, and deduct the incentives paid to calculate the ROI (see below).  
 
 ![](excel_optimize.png)
 
-The highlighted table in yellow is a list of values we can now use curve fitting in R, to get a good approximation of that relationship. We can use the output (a function) to tell us the optimal Incentive for each value of Premium (in the range of our dataset anyways).
+The highlighted table in yellow is a list of values we can now use for curve fitting in R, to get a good approximation of that relationship. The output of that fit will tell us the optimal `Incentive` for each value of `Premium `.  
 
 ```{r}
 ideal <- read.csv('ideal.csv', header=T)
@@ -91,7 +92,7 @@ range(ideal$incentive)
 ggplot(ideal, aes(x=premium, y=incentive))+geom_point()
 ```
 
-Now, this part will not make sense to most people - but since my background is Pharmacology, I thought "Gee that looks an awful lot like a sigmoidal dose response curve", so I download the `drc` package in R to fit the data.  I guess you'll just have to trust me that it makes sense (and I'm sure there are other packages and formulas that would approximate the fit just fine).  
+Now, this part will not make sense to most people - but since my background is in Pharmacology, I thought "Gee that looks an awful lot like a sigmoidal dose response curve", so I download the `drc` package in R to fit the data.  I guess you'll just have to trust me that it makes sense (and I'm sure there are other packages and formulas that would approximate the fit just fine).   
 ```{r, message=F, warning=F}
 library(drc); library(modelr)
 drc <- drm(incentive ~ premium, data = ideal, fct = LL.4(), type = 'continuous')
@@ -99,11 +100,14 @@ rsquare(drc, ideal)
 plot(drc, log = '', cex = 2)
 ```
 
-Looks close enough for me.  Now we can call `predict()` to get the optimal Incentive as a function of Premium! 
+Looks pretty close.  Now we can call `predict()` to get the optimal Incentive as a function of Premium! 
 
 ### Room for Improvement  
-Now.. What to do about people who are already very likely to renew their policy.  This formula works to find the maximum amount to spend, as a function of the premium, to increase the Probability of Renewal for people with a low P(baseline) - ie, **unlikely** to renew.  But, they are a relatively small portion of the dataset (~6%).  Performing well here will involve some kind of optimization of policies that are already near P(baseline)=1.  One thing I noticed from the Excel sheet was that spending less than the optimal amount never resulted in a LOSS (negative ROI).  In other words, it is always worth spending a little to bump up your P(baseline) to 1, even if it was already very high.  
-So, the first thing to do on the test set is to calculate how much 'room' for improvement there is before you hit P(renewal) = 1.  That is simply 1 - P(baseline) -- which again is just the output of our logistic regression model.
+Now.. What about people who are already very likely to renew their policy?  This formula works to find the *maximum amount* to spend on `Incentive`, as a function of `Premium`, above which we are not maximizing our ROI.  But people with low **P(baseline)** (`Probability of Renewal`) are a relatively small portion of the dataset (~6%).  Performing well *overall* will require optimizing ROI from the majority who are already near P(baseline)=1.  
+  
+I noticed from the Excel sheet that spending **less** than the optimal amount *never resulted in a LOSS* (negative ROI).  In other words, *it is always worth spending a little to bump up your P(baseline) to 1, even if it was already very high. *  
+  
+Therefore, the first step on the test set is to calculate how much 'room' for improvement there is before you hit P(renewal) = 1.  That is simply `1 - P(baseline)` -- which again is just the output of our logistic regression model.
 
 ```{r, cache=F}
 test <- read.csv('test.csv') #read in
@@ -115,7 +119,8 @@ testCC$room <- 1 - testCC$pred # calculate room for improvement
 ```
 
 ### Solve for X (?!)   
-OK, next is where we run into a problem:  We have a new **maximum** for how much we should incentivize, but in units of Y (based on the relationship we already have for those variables, see fun.3 above).  AND, the equation is ridiculously complicated, to the point that Wolfram Alpha can't even solve for X.  We could go back to school for a math degree, OR... use another function approximation from observable data points.  
+OK, next is where we run into a problem:  We have a new **maximum** for how much we should incentivize, but in units of Y (based on the relationship we already have for those variables; see fun.3 above).  
+AND, the equation is ridiculously complicated, to the point that *Wolfram Alpha* can't even solve for X.  We could go back to school for a math degree, OR... use another function approximation from observable data points.  
 
 ```{r}
 y = seq(0,1000, 10) # range of incentives, new Y
@@ -133,7 +138,7 @@ model <- lm(log(y) ~ x + I(x^2) + I(x^3) -1, data=solveX) # -1 = no intercept te
 summary(model)
 ```
 
-Well, I like the R-squared.  Works for me.  Now we have a way to go from 'room' variable (room for improvement before you hit probability of 1) to Incentive. 
+Well, I'm satisfied with the R-squared.  Now we have a way to go from the 'room' variable (room for improvement before you hit probability of 1) to Incentive.  
 ```{r}
 model$coefficients
 fun.model <- function(x) exp( (model$coefficients[1]*x )+
@@ -141,7 +146,7 @@ fun.model <- function(x) exp( (model$coefficients[1]*x )+
                                 (model$coefficients[3]*(x^3)) )
 ```
 
-We'll use this to calculate what the incentive should be when the 'room' for improvement is less than what the ideal incentive would suggest.  
+We'll use this to calculate what the incentive should be, when the 'room' for improvement is **less than** what the ideal incentive (only a function of `premium`) would suggest.  
 
 Here is the code to finish these calculations on the test set to get our predictions. If you followed along so far, this should be no problem.  
 ```{r}
@@ -159,27 +164,28 @@ head(testX, 10)
 ```
 
 
+### Imperfection  
+So, the caveat is that because my function approximations weren't perfect, I've got a few predicted overall probabilities (after incentives) that are a hair over 1.0.  There is no mechanism in place to detect or penalize for that (aside from lost revenue), so you could leave them as-is, or scale down the incentives by a certain percentage (seems to happen mostly when the premium is within a certain range).    
+
+
 ```{r}
 nrow(testX) / nrow(testCC)
 summary(testX$incentives)
 ```
-
-### Imperfection  
-So, the caveat is that because my function approximations weren't perfect, I've got a few predicted predicted probabilities (after incentives) that are a hair over 1.0.  There is no mechanism in place to detect or penalize for that (aside from lost revenue), so you could leave them as-is, or scale down the incentives by a certain percentage, when the premium is within a certain range.  
-
-
-## Performance
-*From me* I got distracted as the deadline approached, and never submitted for a final score.  I *had* made submissions that were on the top ~1/3 of the leaderboard before figuring out the optimization part, but "the platform" for this particular competition is a dud for people coming to learn:  
+  
+  
+## Evaluation  
+**Of me:** I got distracted as the deadline approached, and never submitted for a final score.  I *had* made submissions that were on the top ~1/3 of the leaderboard before figuring out the optimization part, but.. **the platform** for this particular competition is a dud for people coming to learn:  
   
 * doesn't automatically submit your best score   (why??)
 * neither the problem decription nor solution check are up after the competition closes  (I thought perhaps because it was a problem used for hiring/interviews, but its the same for all past competitions)  
-* THE TYPO- I refered to ambiguity earlier, there was actually a typo in the description of a variable, and the formulas given described increase in probability on a 0-100 scale.    
+* THE TYPO- the ambiguity referenced earlier- there was actually a typo in the description of a variable, and the formulas given described increase in probability on a 0-100 scale.    
 * No clarification of ambiguity offered during the hackathon despite a Slack channel dedicated to it.
 
 
 A bit anti-climactic I suppose. **Lesson learned:  Stick to Kaggle if you're learning.    **
     
-I'd love to know the 'right' way to go about this problem, **so if you have an opinion or a link, please share!  **
+I'd love to know the 'right' way to go about this problem, **so if you have an opinion or alternate strategy, even a link to a useful tutorial, please share!  **
   
 ![](https://pictures.abebooks.com/ZZQACAN1/22383688723.jpg)
 
