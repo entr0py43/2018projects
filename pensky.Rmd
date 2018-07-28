@@ -166,49 +166,69 @@ We'll use this to calculate what the incentive should be, when the 'room' for im
 
 Here is the code to finish these calculations on the test set to get our predictions. If you followed along so far, this should be no problem.  
 ```{r}
-testX <- testCC[,c(1,12:14)] # dplyr select knitr fail
+testX <- testCC[,c(1,12:14)] # dplyr 'select' knitr fail
 testX <- testX %>% 
-  mutate(ideal_incentive = predict(drc, test[c('id','premium')])) %>% # optimum based on premium
-  mutate(room_incentive = fun.model(pmin(room, 0.1669))) %>%  # max spend dictated by headroom
+  mutate(delta_P = pmin(room, 0.1669)) %>% 
+  mutate(p_incentives = pred + delta_P) %>% 
+  mutate(ideal_incentive = predict(drc, testCC[c('id','premium')])) %>% # optimum based on premium
+  mutate(room_incentive = fun.model(delta_P)) %>%  # max spend dictated by headroom
   mutate(incentives = trunc(pmin(ideal_incentive, room_incentive))) %>% # take the lower value
-  mutate(new_prob = fun.3(incentives) + pred) %>% # verify
-  filter(new_prob >= 1) %>% # uh oh?
-  # select(id, premium, pred, room) %>% # failing in knitr
-  arrange(desc(new_prob))
+  mutate(new_prob = fun.3(incentives) + pred) # sanity check
 
 head(testX, 10)
 ```
 
 
 ### Imperfection  
-So, the caveat is that because my function approximations weren't perfect, I've got a few predicted overall probabilities (after incentives) that are a hair over 1.0.  There is no mechanism in place to detect or penalize for that (aside from lost revenue), so you could leave them as-is, or scale down the incentives by a certain percentage (seems to happen mostly when the premium is within a certain range).    
+So, the caveat is that because my function approximations weren't perfect, if I calculate the percentage of improvement based on what I spent, I have some instances where it seems like I'm spending more than I should.  
+```{r}
+over1 <- testX %>% 
+  filter(new_prob >= 1) %>% # uh oh?
+  arrange(desc(new_prob))
 
+head(over1, 10)
+```
+
+There is no mechanism in place to detect or penalize for that (aside from lost revenue), so you could leave them as-is, or scale down the incentives by a certain percentage (seems to happen mostly when the premium is within a certain range).  I'll leave it to you to play with.  
 
 ```{r}
-nrow(testX) / nrow(testCC)
-summary(testX$incentives)
+nrow(over1) / nrow(testCC)
+summary(over1$incentives)
 ```
   
   
 ## Evaluation  
-**Of me:** I got distracted as the deadline approached, and never submitted for a final score.  I *had* made submissions that were on the top ~1/3 of the leaderboard before figuring out the optimization part, but.. **the platform** for this particular competition is a dud for people coming to learn:  
+**Of me:** I got distracted as the deadline approached, and never submitted for a final score.  I *had* made submissions that were on the top ~1/3 of the leaderboard before figuring out the optimization part.   
+**Of the platform** it's a dud for people coming to learn:  
   
 * doesn't automatically submit your best score   (why??)
-* neither the problem decription nor solution check are up after the competition closes  (I thought perhaps because it was a problem used for hiring/interviews, but its the same for all past competitions)  
-* THE TYPO- the ambiguity referenced earlier- there was actually a typo in the description of a variable, and the formulas given described increase in probability on a 0-100 scale.    
-* No clarification of ambiguity offered during the hackathon despite a Slack channel dedicated to it.
+* the data, the problem decription, and solution checker are all taken down after the competition closes  (I thought perhaps because it was a problem used for hiring/interviews, but its the same for all past competitions)  
+* the ambiguity referenced earlier- there was actually a typo in the description of a variable, and the formulas given described increase in probability on a 0-100 scale. I'm sure most people caught it but just seems lazy.  
+* No clarification of said ambiguity offered during the hackathon despite a Slack channel dedicated to it, and people asking for clarification.
 
 
-A bit anti-climactic I suppose. **Lesson learned:  Stick to Kaggle if you're learning.    **
+A bit anti-climactic I suppose. **Lesson learned:  Stick to Kaggle if you're learning. **
     
-I'd love to know the 'right' way to go about this problem, **so if you have an opinion or alternate strategy, even a link to a useful tutorial, please share!  **
+If you have some optimization experience or math chops, I'd love to know the 'right' way to go about this problem, **so if you have an opinion or alternate strategy, even a link to a useful tutorial, please share!  **
 
 Here is some code to approximate your score on the test set (which is pretty easy to do, if you just use AUC on the training data)
 ```{r}
-cf = .3 * sum(test$premium)
-score = .7 * auc + sum(test$pred*premium)*cf
-```
+# revenue without incentives, wi
+# 0.9 threshold for renewal
+wi <- sum(
+  (ifelse(testX$pred>=.9,testX$pred,0) )*testX$premium) # 317M
 
+# total possible revenue; sum of premiums
+all <- sum(testX$premium) # 370M
+
+# your revenue after incentives
+rev <- sum((testX$p_incentives*testX$premium)-testX$incentives) # 364M
+
+incent_score <- (rev-wi)/(all-wi); incent_score
+
+score = (.7 * auc) + .3*(incent_score); score
+```
+How it relates to the leaderboard scores... it doesn't, it's just for checking your own ideas re: optimization.  You would do a test-train split if you wanted to have a better idea of out-of-bag performance of your binary classifier. 
 
 
   
