@@ -1,6 +1,6 @@
 # 2018projects
 
-* https://entr0py43.github.io//2018projects//pensky.html  
+* [optimization problem](https://entr0py43.github.io//2018projects//pensky.html)  
 
 
 some other sample code in R or python 3. while github renders notebooks pretty well, click the link below to open the notebooks interactively via Binder  
