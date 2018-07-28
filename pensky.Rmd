@@ -25,7 +25,7 @@ pacman::p_load(tidyverse, plotROC, pROC, DMwR2, plotly)
 fun.3 <- function(x) .2*(1-exp(-2*(1-exp(-x/400))))
 p <- ggplot(data=data.frame(x=0), mapping = aes(x=x))
 q <- p + stat_function(fun = fun.3)+xlim(0,1500)+ylim(0,.175)+
-  xlab('Incentives Spent to Increase Probability')+
+  xlab('Incentives Spent to Increase Renewal Probability')+
   ylab('Increase in Prob: delta_P')
 ggplotly(q)
 ```
@@ -36,14 +36,14 @@ ggplotly(q)
 * `Premium` cost of the policy
 * `P(baseline)` model's predictions of renewal probability, before incentives
 * `delta_P` improvement in Probability of Renewal from Incentive
-* `P(incentivized)` is the improved Probability of Renewal, after incentives, so P(baseline) + delta_P
+* `P(incentivized)` is the improved Probability of Renewal, after incentives, so `P(baseline)` + `delta_P`
    
 
-**The goal** is to maximize the following formula for `Total Net Revenue`, summed across all the rows of the dataset:    
+### The Goal  
+The optimization (Part B) is to maximize the following formula for `Total Net Revenue`, summed across all the rows of the dataset:    
 
-( `P(incentivized)` * `Premium` ) - `Incentive`   
+  ( `P(incentivized)` * `Premium` ) - `Incentive`
   
-
 **My approach:**  Work out the relationships between variables using function approximation.  *If/when I come across a more elegant/correct way to do the optimization, I'll update this page or write a part 2.  *    
 
 ### Considerations
@@ -53,7 +53,7 @@ ggplotly(q)
 * You'll want to maximize policies with high `P(baseline)` to 1, because small `delta_P`s don't cost very much (curve is steepest close to origin).  
     - That seems silly and probably not something you'd do in real life, BUT the problem did not account for compensation of the agent, so **your only goal is to maximize return according to the formula given.**  
 * The smaller the premium, the smaller the 'upper limit' will be on incentives, since the incentive will provide diminishing returns as the curve flattens out. **The optimum ROI will depend on the premium amount.** 
-    - ROI formula: delta_P*premium - incentive  
+    - ROI formula: `delta_P`*`Premium` - `Incentive`  
   
 
 ## Scoring Metric   
@@ -228,7 +228,7 @@ incent_score <- (rev-wi)/(all-wi); incent_score
 
 score = (.7 * auc) + .3*(incent_score); score
 ```
-How it relates to the leaderboard scores... it doesn't, it's just for checking your own ideas re: optimization.  You would do a test-train split if you wanted to have a better idea of out-of-bag performance of your binary classifier. 
+Just a quick way to check your own ideas re: optimization.  You would do a test-train split if you wanted to have a better idea of out-of-bag performance of your binary classifier. 
 
 
   
