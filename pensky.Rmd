@@ -1,6 +1,6 @@
 ---
 title: "Revenue Optimization Problem"
-author: 
+author: "July 2018 Hackacthon"
 output:
   html_document:
     theme: spacelab
@@ -18,7 +18,7 @@ Background:  Decided to participate in a 36 hour 'over the weekend' data science
 
 
 ## Problem Statement   
-Basically a two-parter. **Part A**  You, a data scientist at an insurance company, are trying to predict the probability of policy renewal for each customer (standard 'churn' problem, logistic regression).  The interesting part was **Part B** the optimization, and my main focus here.  You can spend extra (**"Incentives**) to have agents pay extra attention to clients, and thereby gain an **Increase in Probability** of renewal. BUT, this relationship was not linear. 
+Basically a two-parter. **Part A**  You, a data scientist at an insurance company, are trying to predict the probability of policy renewal for each customer (standard 'churn' problem, logistic regression).  The interesting part was **Part B** the optimization, and my main focus here:  You can spend extra (**Incentives**) to have agents pay closer attention to clients, and thereby gain an **Increase in Probability** of renewal. BUT, this relationship is not linear but rather defined the figure below.  
 
 ```{r, message=F}
 pacman::p_load(tidyverse, plotROC, pROC, DMwR2, plotly)
@@ -26,23 +26,38 @@ fun.3 <- function(x) .2*(1-exp(-2*(1-exp(-x/400))))
 p <- ggplot(data=data.frame(x=0), mapping = aes(x=x))
 q <- p + stat_function(fun = fun.3)+xlim(0,1500)+ylim(0,.175)+
   xlab('Incentives Spent to Increase Probability')+
-  ylab('Increase in Probability')
+  ylab('Increase in Prob: delta_P')
 ggplotly(q)
 ```
+
+**Terms** 
+
+* `Incentive` money spent to improve Probability of Renewal  
+* `Premium` cost of the policy
+* `P(baseline)` model's predictions of renewal probability, before incentives
+* `delta_P` improvement in Probability of Renewal from Incentive
+* `P(incentivized)` is the improved Probability of Renewal, after incentives, so P(baseline) + delta_P
+   
+
+**The goal** is to maximize the following formula for `Total Net Revenue`, summed across all the rows of the dataset:    
+
+( `P(incentivized)` * `Premium` ) - `Incentive`   
   
-  
-**The goal** is to maximize Total Net Revenue, defined by:  the updated Probability, P(baseline + incentive bump) *times* the Premium on the policy *minus* whatever you spent on Incentives (summed across all rows).  
 
 **My approach:**  Work out the relationships between variables using function approximation.  *If/when I come across a more elegant/correct way to do the optimization, I'll update this page or write a part 2.  *    
 
 ### Considerations
 
-* Probability ranges from 0-1.  If a customer is predicted to have a high probability of renewing their policy (say ~0.99), you cannot incentivize their policy to a combined probability > 1.  In other words, **the maximum revenue per policy, before subtracting incentives, is the Premium.**   
-* You'll want to maximize those policies that already have high baseline P(renewal) to 1, because small Improvements don't cost very much (curve is steepest closer to 0).  That seems silly and probably not something you'd do in real life, BUT the problem did not account for compensation of the agent, so **your only goal is to maximize return according to the formula given.**  
-* The smaller the premium, the smaller the 'upper limit' will be on incentives, since the incentive cost-per-%-improvement will provide diminishing returns as the curve flattens out.  **The optimium ROI will depend on the premium amount.** (I'll cover in a minute)
+* Probability ranges from 0-1.  If a customer is predicted to have a high probability of renewing their policy (say P(baseline) = 0.98), regardless of incentives, a combined probability P(incentivized) > 1 is impossible by definition.  
+    - In other words, **the maximum revenue per policy, before subtracting incentives, is the Premium.**   
+* You'll want to maximize policies with high `P(baseline)` to 1, because small `delta_P`s don't cost very much (curve is steepest close to origin).  
+    - That seems silly and probably not something you'd do in real life, BUT the problem did not account for compensation of the agent, so **your only goal is to maximize return according to the formula given.**  
+* The smaller the premium, the smaller the 'upper limit' will be on incentives, since the incentive will provide diminishing returns as the curve flattens out. **The optimum ROI will depend on the premium amount.** 
+    - ROI formula: delta_P*premium - incentive  
+  
 
-## Scoring Metric  
-I'll ignore for now, since the dataset isn't public, and there is no longer a way to check your score with their metric.  Scoring was a weighted average that favored the AUC (of the ROC) for your Part A solution (70% of score), and the other ~30% of score was calculated from your total net revenue.  
+## Scoring Metric   
+Scoring was a weighted average that favored (70% of score) the AUC for your Part A solution, with the remaining ~30% calculated from your total net revenue.  I've included some code at the end to approximate this (solution checker page taken down after competition, boo)  
 
 ## EDA + Model
 A simple logistic regression on untransformed variables performed fairly well in this case.  (predictor variables included: age, number of premiums paid on time/late, income, and underwriter/credit score).  
@@ -54,7 +69,7 @@ lr0 <- glm(renewal ~ ., data = trainCC, family = 'binomial')
 lr0pred <- predict(lr0, trainCC, type = 'resp')
 trainCC$lr0pred <- lr0pred
 ggplot(trainCC, aes(d=renewal, m = lr0pred))+geom_roc()
-auc <- roc(trainCC$renewal, lr0pred); auc # on training
+roc <- roc(trainCC$renewal, lr0pred); auc<-roc$auc # on training
 ```
 
 Sometime soon I'll make a companion post exploring how to optimize the binary classifier model. But since the best AUC I saw was ~0.85, I call that darn good for a first-pass.  FWIW, feature engineering/transforms did little to enhance the model, according to several of the top-ranked participants, and my own fiddling (quite frustrating!).
@@ -78,21 +93,21 @@ plot_ly(x=~incentives,
 ```
 
 
-What I did instead was turned to (old faithful) Excel, and plotted a poor man's 3d surface.  We already know the relationship between `Incentive` and `Increase in Probability`, so we can multiply the latter by a range of premium amounts, and deduct the incentives paid to calculate the ROI (see below).  
+What I did instead was turned to (old faithful) Excel, and plotted a poor man's 3d surface.  We already know the relationship between `Incentive` and `Increase in Probability`, so we can multiply the latter by a range of premium amounts, and deduct the incentives paid to calculate the ROI (see below).  Then you can use conditional formatting to easily spot the top 3 values per column.  
 
 ![](excel_optimize.png)
 
-The highlighted table in yellow is a list of values we can now use for curve fitting in R, to get a good approximation of that relationship. The output of that fit will tell us the optimal `Incentive` for each value of `Premium `.  
+The highlighted table in yellow is a list of values we can now *fit* to get a good approximation of that relationship. The output of that fit will tell us the optimal `Incentive` for each value of `Premium `.  **Note:** you never spend more than ~920 on `Incentive`.  Because of the asymptotic shape of that curve, it makes sense there is an upper limit, and that corresponds to an Percent Increase of 0.1669. 
 
 ```{r}
-ideal <- read.csv('ideal.csv', header=T)
+ideal <- read.csv('ideal.csv', header=T) # from excel
 colnames(ideal) <- c('premium', 'incentive')
 tail(ideal)
 range(ideal$incentive)
 ggplot(ideal, aes(x=premium, y=incentive))+geom_point()
 ```
 
-Now, this part will not make sense to most people - but since my background is in Pharmacology, I thought "Gee that looks an awful lot like a sigmoidal dose response curve", so I download the `drc` package in R to fit the data.  I guess you'll just have to trust me that it makes sense (and I'm sure there are other packages and formulas that would approximate the fit just fine).   
+Now, this part will not make sense to most people - but since my background is in Pharmacology, I thought "gee that looks an awful lot like a sigmoidal dose response relationship." So, I download the [`drc` package](https://cran.r-project.org/web/packages/drc/index.html)  to fit the data.  *I guess you'll just have to trust me that it makes sense (and I'm sure there are other packages and formulas that would approximate the fit just fine).   *
 ```{r, message=F, warning=F}
 library(drc); library(modelr)
 drc <- drm(incentive ~ premium, data = ideal, fct = LL.4(), type = 'continuous')
@@ -100,13 +115,14 @@ rsquare(drc, ideal)
 plot(drc, log = '', cex = 2)
 ```
 
-Looks pretty close.  Now we can call `predict()` to get the optimal Incentive as a function of Premium! 
+Looks pretty close.  Now we can call `predict()` to get the optimal `Incentive` as a function of `Premium`! 
 
-### Room for Improvement  
-Now.. What about people who are already very likely to renew their policy?  This formula works to find the *maximum amount* to spend on `Incentive`, as a function of `Premium`, above which we are not maximizing our ROI.  But people with low **P(baseline)** (`Probability of Renewal`) are a relatively small portion of the dataset (~6%).  Performing well *overall* will require optimizing ROI from the majority who are already near P(baseline)=1.  
+### 'Room' for Improvement  
+Now.. What about people who are already very likely to renew their policy?  We used Excel and curve fitting to calculate the *ideal maximum amount* to spend on `Incentive`, as a function of `Premium` - above which our ROI starts to decline.  But people with a low P(baseline) (`Probability of Renewal`) are a relatively small portion of the dataset (~6%).  Performing well *overall* will require optimizing ROI from the majority who are already near P(baseline)=1.  
   
-I noticed from the Excel sheet that spending **less** than the optimal amount *never resulted in a LOSS* (negative ROI).  In other words, *it is always worth spending a little to bump up your P(baseline) to 1, even if it was already very high. *  
-  
+Also noted from the Excel sheet: **spending less than the optimal amount **never resulted in a negative ROI.**  In other words, *it is always worth spending a little to bump up your P(baseline) to 1, even if it was already very high. *  
+
+ 
 Therefore, the first step on the test set is to calculate how much 'room' for improvement there is before you hit P(renewal) = 1.  That is simply `1 - P(baseline)` -- which again is just the output of our logistic regression model.
 
 ```{r, cache=F}
@@ -186,6 +202,15 @@ summary(testX$incentives)
 A bit anti-climactic I suppose. **Lesson learned:  Stick to Kaggle if you're learning.    **
     
 I'd love to know the 'right' way to go about this problem, **so if you have an opinion or alternate strategy, even a link to a useful tutorial, please share!  **
+
+Here is some code to approximate your score on the test set (which is pretty easy to do, if you just use AUC on the training data)
+```{r}
+cf = .3 * sum(test$premium)
+score = .7 * auc + sum(test$pred*premium)*cf
+```
+
+
+
   
 ![](https://pictures.abebooks.com/ZZQACAN1/22383688723.jpg)
 
