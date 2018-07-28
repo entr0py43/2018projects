@@ -95,11 +95,11 @@ plot_ly(x=~incentives,
 ```
 
 
-What I did instead was turned to (old faithful) Excel, and plotted a poor man's 3d surface.  We already know the relationship between `Incentive` and `Increase in Probability`, so we can multiply the latter by a range of premium amounts, and deduct the incentives paid to calculate the ROI (see below).  Then you can use conditional formatting to easily spot the top 3 values per column.  
+Instead I turned to (old faithful) Excel, and plotted a poor man's 3d surface.  We already know the relationship between `Incentive` and Increase in Probability `delta_P`, so we can multiply the latter by a range of premium amounts, and deduct the incentives paid to calculate the `ROI` (see below).  Then you can use conditional formatting to easily spot the top 3 values per column.  
 
 ![](excel_optimize.png)
 
-The highlighted table in yellow is a list of values we can now *fit* to get a good approximation of that relationship. The output of that fit will tell us the optimal `Incentive` for each value of `Premium `.  **Note:** you never spend more than ~920 on `Incentive`.  Because of the asymptotic shape of that curve, it makes sense there is an upper limit, and that corresponds to an Percent Increase of 0.1669. 
+The highlighted table in yellow is a list of values we can now *fit* to get a good approximation of that relationship. The output of that fit will tell us the optimal `Incentive` for each value of `Premium `.  **Note:** ideal `incentive` maxes out at ~920, for the 60k upper limit on the range of policy Premiums in our dataset.  Because of the asymptotic shape of that curve, it makes sense there is an upper limit, and that corresponds to an Percent Increase `delta_P` of 0.1669. 
 
 ```{r}
 ideal <- read.csv('ideal.csv', header=T) # from excel
@@ -120,9 +120,9 @@ plot(drc, log = '', cex = 2)
 Looks pretty close.  Now we can call `predict()` to get the optimal `Incentive` as a function of `Premium`! 
 
 ### 'Room' for Improvement  
-Now.. What about people who are already very likely to renew their policy?  We used Excel and curve fitting to calculate the *ideal maximum amount* to spend on `Incentive`, as a function of `Premium` - above which our ROI starts to decline.  But people with a low P(baseline) (`Probability of Renewal`) are a relatively small portion of the dataset (~6%).  Performing well *overall* will require optimizing ROI from the majority who are already near P(baseline)=1.  
+Now.. What about people who are already very likely to renew their policy?  We used Excel and curve fitting to calculate the *ideal maximum amount* to spend on `Incentive`, as a function of `Premium` - above which our ROI starts to decline.  But people with a low  Probability of Renewal `P(baseline)` are a relatively small portion of the dataset (~6%).  Performing well *overall* will require optimizing ROI from the majority who are already near P(baseline)=1.  
   
-Also noted from the Excel sheet: **spending less than the optimal amount **never resulted in a negative ROI.**  In other words, *it is always worth spending a little to bump up your P(baseline) to 1, even if it was already very high. *  
+Also noted from the Excel sheet: **spending less than the optimal amount never resulted in a negative ROI.**  In other words, *it is always worth spending a little to bump up your P(baseline) to 1, even if it was already very high. *  
 
  
 Therefore, the first step on the test set is to calculate how much 'room' for improvement there is before you hit P(renewal) = 1.  That is simply `1 - P(baseline)` -- which again is just the output of our logistic regression model.
