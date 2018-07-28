@@ -3,22 +3,19 @@ title: "Revenue Optimization Problem"
 author: 
 output:
   html_document:
-    theme: lumen
+    theme: spacelab
     toc: yes
     toc_float: yes
   html_notebook:
-    theme: lumen
+    theme: spacelab
 ---
 ```{r, echo=F}
 knitr::opts_chunk$set(error = TRUE)
 ```
 
+Background:  Decided to participate in a 36 hour 'over the weekend' data science hackathon. No aspirations of placing, just learning.  What I'm presenting here is my interpretation of the question, and approach to the problem.  (Unfortunately, there was some ambiguity as to the actual structure of the problem*)  
 
-My approach:  Work out the relationships between variables using function approximation.  If/when I come across the correct way to do the optimization, I'll update this page.      
 
-Background:  Decided to participate in this 'over the weekend' data science 'hackathon-from-home' type competition. No aspirations of placing, just learning. I agreed to participate casually, with a couple of friends.  We'd all approach the problem individually (stipulated by the rules, it was a 'hiring competition', which is also the reason I cannot share the dataset), and compare notes afterwards.  
-  
-What I'm presenting here is my interpretation of the question, and approach to the problem.  (Unfortunately, there was some ambiguity as to the actual structure of the problem) 
 
 ## Problem Statement   
 Basically a two-parter. **Part A**  You, a data scientist at an insurance company, are trying to predict the probability of renewal (standard 'churn' problem, logistic regression).  The interesting part was **Part B** the optimization:  you can spend extra to have the agent give extra attention to clients, and thereby increase their probability of renewal. BUT this relationship was not linear. 
@@ -32,17 +29,20 @@ q <- p + stat_function(fun = fun.3)+xlim(0,1500)+ylim(0,.175)+
   ylab('Increase in Probability')
 ggplotly(q)
 ```
+  
+  
+**The goal** is to maximize Total Net Revenue, defined by:  the updated Probability, P(baseline + incentive bump) *times* the Premium on the policy *minus* whatever you spent on Incentives (summed across all rows).  
 
-The goal is to maximize Total Net Revenue, defined by:  the updated Probability, P(baseline + incentive bump) *times* the Premium on the policy *minus* whatever you spent on Incentives for that policy.  
+**My approach:**  Work out the relationships between variables using function approximation.  If/when I come across a more elegant/correct way to do the optimization, I'll update this page or write a part 2.      
 
 ### Considerations
 
-* Probability ranges from 0-1.  If you spent on incentives for a policy with a high 'baseline' probability of renewal (pre-incentives), that is probably a poor investment.
-* You'll want to maximize those policies that already have high baseline P(renewal). Because it doesn't cost very much (curve is steepest closer to 0).  That seems silly and probably not something you'd do in real life, BUT the problem did not account for compensation of the agent, so your only goal is to maximize return according to the formula given.  
-* The smaller the policy premium, the less you spend on incentives, since the incentive cost per % improvement will provide diminishing returns as the curve flattens out.  The optimium ROI will depend on the premium amount (I'll cover in a minute)
+* Probability ranges from 0-1.  If a customer is predicted to have a high probability of renewing their policy (say ~0.99), you cannot incentivize their policy to combined probability > 1.  In other words, *the maximum renvenue per policy, before subtracting incentives, is the Premium*  
+* You'll want to maximize those policies that already have high baseline P(renewal). Because it doesn't cost very much (curve is steepest closer to 0).  That seems silly and probably not something you'd do in real life, BUT the problem did not account for compensation of the agent, so **your only goal is to maximize return according to the formula given.**  
+* The smaller the premium, the smaller the 'upper limit' will be on incentives, since the incentive cost-per-%-improvement will provide diminishing returns as the curve flattens out.  The optimium ROI will depend on the premium amount (I'll cover in a minute)
 
-## Scoring Metric
-I'll ignore for now, since the dataset isn't public. Your submission included P(baseline) and incentive per policy in the test set.  Scoring was a weighted average that favored the AUC (of the ROC) for your Part A solution (70% of score), and the total net revenue.  
+## Scoring Metric  
+I'll ignore for now, since the dataset isn't public. Your submission included P(baseline) and incentive per policy in the test set.  Scoring was a weighted average that favored the AUC (of the ROC) for your Part A solution (70% of score), and the other ~30% of score was the total net revenue.  
 
 ## EDA + Model
 A simple logisitc regression on untransformed variables performed fairly well in this case.  Since optimizing a binary classifier wasn't what I was interested in learning, and is not the focus of this post, I'll skim over and show you some quick code for getting Part A out of the way.  The `DMwR2` package in R makes kNN imputation quite easy. There were a handful in both the training and test sets that needed to be addressed.
@@ -53,10 +53,10 @@ lr0 <- glm(renewal ~ ., data = trainCC, family = 'binomial')
 lr0pred <- predict(lr0, trainCC, type = 'resp')
 trainCC$lr0pred <- lr0pred
 ggplot(trainCC, aes(d=renewal, m = lr0pred))+geom_roc()
-auc <- roc(trainCC$renewal, lr0pred); auc
+auc <- roc(trainCC$renewal, lr0pred); auc # on training
 ```
 
-So, that's enough for here, I'll make a follow-up post exploring how to optimize that binary classifier model. But since the best AUC I saw was ~.85, I call that darn good for a first-pass.  FWIW, feature engineering did little to enhance the model, according to several of the top-ranked participants, and my own fiddling (quite frustrating!).
+So, that's enough for now, I'll make a companion post exploring how to optimize the binary classifier model. But since the best AUC I saw was ~0.85, I call that darn good for a first-pass.  FWIW, feature engineering did little to enhance the model, according to several of the top-ranked participants, and my own fiddling (quite frustrating!).
 
 
 ## Optimization Strategy  
@@ -64,7 +64,20 @@ The first step was to figure out the optimum 'ROI' for Incentives, across the ra
 ```{r, eval=F}
 fun.3d <- function(x,y) (.2*(1-exp(-2*(1-exp(-x/400))))*y) - x
 ```
-Except I don't have the math chops to do that.  So here's what I did... Turned to my trusty friend Excel, and plotted a poor man's 3d surface.  We already know the relationship between Incentives and Increase in Probability, so we can multiply the latter by each premium amount for a sensible range of Incentive values, and deduct the cost to calculate the ROI (see below).
+Except I don't have the math chops to do that.  It sure is pretty though...
+
+```{r}
+incentives <- seq(0,1000,10)
+premium <- seq(1200,60000, length.out=101)
+roi <- as.matrix(read.csv('surface.csv', header = F))
+
+plot_ly(x=~incentives, 
+        y=~premium,
+        z=~roi) %>% add_surface() 
+```
+
+
+So here's what I did instead:  Turned to my trusty friend Excel, and plotted a poor man's 3d surface.  We already know the relationship between Incentives and Increase in Probability, so we can multiply the latter by each premium amount for a sensible range of Incentive values, and deduct the cost to calculate the ROI (see below).
 
 ![](excel_optimize.png)
 
@@ -156,7 +169,15 @@ So, the caveat is that because my function approximations weren't perfect, I've 
 
 
 ## Performance
-Well, I got busy as the deadline approached, and never submitted for a final score.  I had made submissions that were on the top ~1/3 of the leaderboard before figuring out the optimization part, but "the platform" this particular competition was on doesn't automatically submit your best score, so I don't know how I fared on the final leaderboard... But that wasn't my intent anyways.  As I said, very disappointing the problem doesn't stay up for people to use to learn.  A bit anti-climactic I suppose. Lesson learned, to stay away from this platform.  
+*From me* I got distracted as the deadline approached, and never submitted for a final score.  I *had* made submissions that were on the top ~1/3 of the leaderboard before figuring out the optimization part, but "the platform" for this particular competition is a dud for people coming to learn:  
+  
+* doesn't automatically submit your best score   (why??)
+* neither the problem decription nor solution check are up after the competition closes  (I thought perhaps because it was a problem used for hiring/interviews, but its the same for all past competitions)  
+* THE TYPO- I refered to ambiguity earlier, there was actually a typo in the description of a variable, and the formulas given described increase in probability on a 0-100 scale.    
+* No clarification of ambiguity offered during the hackathon despite a Slack channel dedicated to it.
+
+
+A bit anti-climactic I suppose. **Lesson learned:  Stick to Kaggle if you're learning.    **
     
 I'd love to know the 'right' way to go about this problem, **so if you have an opinion or a link, please share!  **
   
