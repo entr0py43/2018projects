@@ -18,7 +18,7 @@ Background:  Decided to participate in a 36 hour 'over the weekend' data science
 
 
 ## Problem Statement   
-Basically a two-parter. **Part A**  You, a data scientist at an insurance company, are trying to predict the probability of policy renewal for each customer (standard 'churn' problem, logistic regression).  The interesting part was **Part B** the optimization, and my main focus here:  You can spend extra (**Incentives**) to have agents pay closer attention to clients, and thereby gain an **Increase in Probability** of renewal. BUT, this relationship is not linear but rather defined the figure below.  
+Basically a two-parter. **Part A**  You, a data scientist at an insurance company, are trying to predict the probability of policy renewal for each customer (standard 'churn' problem, logistic regression).  **Part B** was the optimization, and my main focus here:  You can spend extra (**Incentives**) to have agents pay closer attention to clients, and thereby gain an **Increase in Probability** of renewal. This relationship is **not** linear, but rather defined the figure below.  
 
 ```{r, message=F}
 pacman::p_load(tidyverse, plotROC, pROC, DMwR2, plotly)
@@ -44,13 +44,15 @@ The optimization (Part B) is to maximize the following formula for `Total Net Re
 
   ( `P(incentivized)` * `Premium` ) - `Incentive`
   
-**My approach:**  Work out the relationships between variables using function approximation.  *If/when I come across a more elegant/correct way to do the optimization, I'll update this page or write a part 2.  *    
+Basically, you are multipling the Premium (revenue), by your odds of receiving it (renewal probability), after accounting for costs (in this case, just the incentive to boost renewal probability).  This is summed across all individual clients (rows in the dataset).  *Real life is more complicated, the goal here is a simple optimization toy problem.  *
+
+**My approach:**  Work out the relationships between variables using function approximation.  
 
 ### Considerations
 
-* Probability ranges from 0-1.  If a customer is predicted to have a high probability of renewing their policy (say P(baseline) = 0.98), regardless of incentives, a combined probability P(incentivized) > 1 is impossible by definition.  
+* Probability ranges from 0-1.  If a customer is predicted to have a high probability of renewing their policy, no matter how much you spend on incentives, their renewal probability cannot be >1, by definition.  
     - In other words, **the maximum revenue per policy, before subtracting incentives, is the Premium.**   
-* You'll want to maximize policies with high `P(baseline)` to 1, because small `delta_P`s don't cost very much (curve is steepest close to origin).  
+* You'll want to maximize policies with high `P(baseline)` to 1, because small `delta_P`s don't cost very much (curve is steepest close to origin).  It's also the majority of cases, ~94%.  
     - That seems silly and probably not something you'd do in real life, BUT the problem did not account for compensation of the agent, so **your only goal is to maximize return according to the formula given.**  
 * The smaller the premium, the smaller the 'upper limit' will be on incentives, since the incentive will provide diminishing returns as the curve flattens out. **The optimum ROI will depend on the premium amount.** 
     - ROI formula: `delta_P`*`Premium` - `Incentive`  
@@ -69,7 +71,7 @@ lr0 <- glm(renewal ~ ., data = trainCC, family = 'binomial')
 lr0pred <- predict(lr0, trainCC, type = 'resp')
 trainCC$lr0pred <- lr0pred
 ggplot(trainCC, aes(d=renewal, m = lr0pred))+geom_roc()
-roc <- roc(trainCC$renewal, lr0pred); auc<-roc$auc # on training
+roc <- roc(trainCC$renewal, lr0pred); auc<-roc$auc; auc # on training
 ```
 
 Sometime soon I'll make a companion post exploring how to optimize the binary classifier model. But since the best AUC I saw was ~0.85, I call that darn good for a first-pass.  FWIW, feature engineering/transforms did little to enhance the model, according to several of the top-ranked participants, and my own fiddling (quite frustrating!).
