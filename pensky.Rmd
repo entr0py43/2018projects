@@ -18,7 +18,7 @@ Background:  Decided to participate in a 36 hour 'over the weekend' data science
 
 
 ## Problem Statement   
-Basically a two-parter. **Part A**  You, a data scientist at an insurance company, are trying to predict the probability of policy renewal for each customer (standard 'churn' problem, logistic regression).  **Part B** was the optimization, and my main focus here:  You can spend extra (**Incentives**) to have agents pay closer attention to clients, and thereby gain an **Increase in Probability** of renewal. This relationship is **not** linear, but rather defined the figure below.  
+Basically a two-parter. **Part A**  You, a data scientist at an insurance company, are trying to predict the probability of policy renewal for each customer (standard 'churn' problem, logistic regression).  **Part B** was the optimization, and my main focus here:  You can spend extra (**Incentives**) to have agents pay closer attention to clients, and thereby gain an **Increase in Probability of renewal**. This relationship is **not linear**, but rather defined the figure below.  
 
 ```{r, message=F}
 pacman::p_load(tidyverse, plotROC, pROC, DMwR2, plotly)
