@@ -53,7 +53,7 @@ Basically, you are multipling the Premium (revenue), by your odds of receiving i
 * Probability ranges from 0-1.  If a customer is predicted to have a high probability of renewing their policy, no matter how much you spend on incentives, their renewal probability cannot be >1, by definition.  
     - In other words, **the maximum revenue per policy, before subtracting incentives, is the Premium.**   
 * You'll want to maximize policies with high `P(baseline)` to 1, because small `delta_P`s don't cost very much (curve is steepest close to origin).  It's also the majority of cases, ~94%.  
-    - That seems silly and probably not something you'd do in real life, BUT the problem did not account for compensation of the agent, so **your only goal is to maximize return according to the formula given.**  
+    - That seems silly and probably not something you'd do in real life, BUT the problem did not account for compensation of the agent, so **your only goal is to maximize revenu ewayaccording to the formula given.**  
 * The smaller the premium, the smaller the 'upper limit' will be on incentives, since the incentive will provide diminishing returns as the curve flattens out. **The optimum ROI will depend on the premium amount.** 
     - ROI formula: `delta_P`*`Premium` - `Incentive`  
   
@@ -109,7 +109,7 @@ range(ideal$incentive)
 ggplot(ideal, aes(x=premium, y=incentive))+geom_point()
 ```
 
-Now, this part will not make sense to most people - but since my background is in Pharmacology, I thought "gee that looks an awful lot like a sigmoidal dose response relationship." So, I download the [`drc` package](https://cran.r-project.org/web/packages/drc/index.html)  to fit the data.  *I guess you'll just have to trust me that it makes sense (and I'm sure there are other packages and formulas that would approximate the fit just fine).   *
+Now, this part will not make sense to most people - but since my background is in Pharmacology, I thought "gee that looks an awful lot like a sigmoidal dose response relationship." So, I downloaded the [`drc` package](https://cran.r-project.org/web/packages/drc/index.html)  to fit the data.  *I guess you'll just have to trust me that it makes sense (and I'm sure there are other packages and formulas that would approximate the fit just fine).   *
 ```{r, message=F, warning=F}
 library(drc); library(modelr)
 drc <- drm(incentive ~ premium, data = ideal, fct = LL.4(), type = 'continuous')
@@ -209,7 +209,7 @@ summary(over1$incentives)
 * No clarification of said ambiguity offered during the hackathon despite a Slack channel dedicated to it, and people asking for clarification.
 
 
-A bit anti-climactic I suppose. **Lesson learned:  Stick to Kaggle if you're learning. **
+A bit anti-climactic I suppose. **Lesson learned:  Stick to Kaggle if you're learning. **  I'm intentionally avoiding naming the problem and the platform until I get "permission."  
     
 If you have some optimization experience or math chops, I'd love to know the 'right' way to go about this problem, **so if you have an opinion or alternate strategy, even a link to a useful tutorial, please share!  **
 
