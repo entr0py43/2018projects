@@ -55,8 +55,9 @@ Basically, you are multipling the Premium (revenue), by your odds of receiving i
 * You'll want to maximize policies with high `P(baseline)` to 1, because small `delta_P`s don't cost very much (curve is steepest close to origin).  It's also the majority of cases, ~94%.  
     - That seems silly and probably not something you'd do in real life, BUT the problem did not account for compensation of the agent, so **your only goal is to maximize revenue according to the formula given.**  
 * The smaller the premium, the smaller the 'upper limit' will be on incentives:  the increase in probability `delta_P` has a fixed cost, but the revenue boost it provides (`delta_P` \* `Premium`) is a function of the Premium. 
+    - Introducing *revenue-related* term `ROI`, to differentiate: the ROI is the revenue-gain for applying the incentive, without consideration of P(baseline))
+    - ROI formula: `delta_P`\*`Premium` - `Incentive`  
     - **The optimum ROI will depend on the premium amount.** 
-    - ROI formula: `delta_P`*`Premium` - `Incentive`  
   
 
 ## Scoring Metric   
