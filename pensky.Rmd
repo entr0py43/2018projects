@@ -219,7 +219,7 @@ Here is some code to approximate your score on the test set (which is pretty eas
 # revenue without incentives, wi
 # 0.9 threshold for renewal
 wi <- sum(
-  (ifelse(testX$pred>=.9,testX$pred,0) )*testX$premium) # 317M
+  (ifelse(testX$pred>=.9, 1, 0) )*testX$premium) # 328M
 
 # total possible revenue; sum of premiums
 all <- sum(testX$premium) # 370M
