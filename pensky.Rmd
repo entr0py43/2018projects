@@ -53,8 +53,9 @@ Basically, you are multipling the Premium (revenue), by your odds of receiving i
 * Probability ranges from 0-1.  If a customer is predicted to have a high probability of renewing their policy, no matter how much you spend on incentives, their renewal probability cannot be >1, by definition.  
     - In other words, **the maximum revenue per policy, before subtracting incentives, is the Premium.**   
 * You'll want to maximize policies with high `P(baseline)` to 1, because small `delta_P`s don't cost very much (curve is steepest close to origin).  It's also the majority of cases, ~94%.  
-    - That seems silly and probably not something you'd do in real life, BUT the problem did not account for compensation of the agent, so **your only goal is to maximize revenu ewayaccording to the formula given.**  
-* The smaller the premium, the smaller the 'upper limit' will be on incentives, since the incentive will provide diminishing returns as the curve flattens out. **The optimum ROI will depend on the premium amount.** 
+    - That seems silly and probably not something you'd do in real life, BUT the problem did not account for compensation of the agent, so **your only goal is to maximize revenue according to the formula given.**  
+* The smaller the premium, the smaller the 'upper limit' will be on incentives:  the increase in probability `delta_P` has a fixed cost, but the revenue boost it provides (`delta_P` \* `Premium`) is a function of the Premium. 
+    - **The optimum ROI will depend on the premium amount.** 
     - ROI formula: `delta_P`*`Premium` - `Incentive`  
   
 
