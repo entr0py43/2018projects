@@ -176,15 +176,15 @@ testX <- testX %>%
   mutate(ideal_incentive = predict(drc, testCC[c('id','premium')])) %>% # optimum based on premium
   mutate(ideal_delta_P = fun.3(ideal_incentive)) %>% # delta_P for ideal incentive
   mutate(actual_delta_P = pmin(room, ideal_delta_P)) %>%  # take lower
-  mutate(incen_room = predict(drc2, data.frame(x = actual_delta_P))) %>% 
-  # mutate(incen_funmodel = fun.model(actual_delta_P)) %>% 
   mutate(p_incentives = pred + actual_delta_P) %>% 
-  mutate(incentives = trunc(pmin(ideal_incentive, incen_room))) %>% # take the lower value
+  mutate(incen_room = 10^(predict(drc2, data.frame(x = room)))) %>% # remember y was log10(y)
+  mutate(incentives = pmin(ideal_incentive, incen_room)) %>% # take the lower value
   mutate(new_prob = fun.3(incentives) + pred) # sanity check
 
 head(testX, 10)
 ```
-
+Cool, check out line 8, where out new overall probability of renewal (`p_incentives`) is 0.9978. Is that just the error in our function approximations?  Nope, it's actually dictated by the ideal_incentive/ideal_delta_p, which is a hair less than what we have 'room' for (.125 vs .127). Neat, math is fun!   
+Line 7 on the other hand, started at ~.59 and had plenty of `room` -- but, since the policy amount was low (3300), so was the ideal_incentive, so he ends up with a new renewal probability of only ~.69.  
 
 
 ## Evaluation  
