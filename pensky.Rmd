@@ -13,7 +13,7 @@ output:
 knitr::opts_chunk$set(error = TRUE)
 ```
 
-Background:  Decided to participate in a 36 hour 'over the weekend' data science hackathon. No aspirations of placing, just learning.  What I'm presenting here is my interpretation of the question, and approach to the problem.  (Unfortunately, there was some ambiguity as to the actual structure of the problem*)  
+Background:  Decided to participate in a short 'over the weekend' data science hackathon. No aspirations of placing, just learning.  What I'm presenting here is my interpretation of the question, and approach to the problem.  (Unfortunately, there was some ambiguity as to the actual structure of the problem*)  
 
 
 
@@ -111,7 +111,7 @@ range(ideal$incentive)
 ggplot(ideal, aes(x=premium, y=incentive))+geom_point()
 ```
 
-Now, this part will not make sense to most people - but since my background is in Pharmacology, I thought "gee that looks an awful lot like a sigmoidal dose response relationship." So, I downloaded the [`drc` package](https://cran.r-project.org/web/packages/drc/index.html)  to fit the data.  *I guess you'll just have to trust me that it makes sense (and I'm sure there are other packages and formulas that would approximate the fit just fine).   *
+Now, this part will not make sense to most people - but since my background is in Pharmacology, I thought "gee that looks an awful lot like a dose response relationship." (The top half of a sigmoidal curve going through the origin.)  So, I downloaded the [`drc` package](https://cran.r-project.org/web/packages/drc/index.html)  to fit the data.  *I guess you'll just have to trust me that it makes sense (and I'm sure there are other packages and formulas that would approximate the fit just fine).   *
 ```{r, message=F, warning=F}
 library(drc); library(modelr)
 drc <- drm(incentive ~ premium, data = ideal, fct = LL.4(), type = 'continuous')
@@ -139,8 +139,9 @@ testCC$room <- 1 - testCC$pred # calculate room for improvement
 ```
 
 ### Solve for X (?!)   
-OK, next is where we run into a problem:  We have a new **maximum** for how much we should incentivize, but in units of Y (based on the relationship we already have for those variables; see fun.3 above).  
-AND, the equation is ridiculously complicated, to the point that *Wolfram Alpha* can't even solve for X.  We could go back to school for a math degree, OR... use another function approximation from observable data points.  
+OK, next is where we run into a problem: We have a new **maximum** for how much we *should* incentivize (ideally), but in units of Y/`delta_P` (based on the relationship we already have for those variables; see fun.3 above).  We want to calculate `Incentive` as a function of `delta_P`, when delta_P is dictated by 'room.'  
+
+AND, the equation is ridiculously complicated, to the point that [Wolfram Alpha](http://www.wolframalpha.com/) can’t even solve for X. We could go back to school for a math degree, OR… use another function approximation from observable data points.
 
 ```{r}
 y = seq(0,1000, 10) # range of incentives, new Y
@@ -151,69 +152,54 @@ tail(solveX)
 plot((solveX$x), log(solveX$y))
 ```
 
-Wild. Ok, looks like a 3rd order polynomial might be able to approximate.  
+So, it sort of looks like a 3rd order polynomial might approximate, but on closer inspection that doesn't work very well.  Instead, we'll get rid of the values of `delta_P`/x above about .12, and try to use the dose response curve fit once again (we mostly care about the low values of delta_P that will dictate `Incentive` in cases where P(renewal) is already high).
 
 ```{r}
-model <- lm(log(y) ~ x + I(x^2) + I(x^3) -1, data=solveX) # -1 = no intercept term, force thru origin
-summary(model)
+solveX<- solveX[1:28,]
+s <- ggplot(data=solveX, aes(x=x, y=y))+geom_point()+
+  scale_y_log10(); s
+solveX$log10incent <- log10(solveX$y)
+drc2 <- drm(log10incent ~ x, data = solveX, fct = LL.4(), type = 'continuous')
+rsquare(drc2, solveX)
+plot(drc2, log = '', cex = 2, xlab = 'delta_P')
 ```
 
-Well, I'm satisfied with the R-squared.  Now we have a way to go from the 'room' variable (room for improvement before you hit probability of 1) to Incentive.  
-```{r}
-model$coefficients
-fun.model <- function(x) exp( (model$coefficients[1]*x )+
-                                (model$coefficients[2]*(x^2))+
-                                (model$coefficients[3]*(x^3)) )
-```
+Well, it's not perfect, but R-squared is pretty good.  
 
-We'll use this to calculate what the incentive should be, when the 'room' for improvement is **less than** what the ideal incentive (only a function of `premium`) would suggest.  
+We'll use this to calculate what the incentive should be, when the `room` for improvement is **less than** what the ideal incentive (only a function of `premium`) would suggest.  
 
 Here is the code to finish these calculations on the test set to get our predictions. If you followed along so far, this should be no problem.  
 ```{r}
 testX <- testCC[,c(1,12:14)] # dplyr 'select' knitr fail
-testX <- testX %>% 
-  mutate(delta_P = pmin(room, 0.1669)) %>% 
-  mutate(p_incentives = pred + delta_P) %>% 
+
+testX <- testX %>%
   mutate(ideal_incentive = predict(drc, testCC[c('id','premium')])) %>% # optimum based on premium
-  mutate(room_incentive = fun.model(delta_P)) %>%  # max spend dictated by headroom
-  mutate(incentives = trunc(pmin(ideal_incentive, room_incentive))) %>% # take the lower value
+  mutate(ideal_delta_P = fun.3(ideal_incentive)) %>% # delta_P for ideal incentive
+  mutate(actual_delta_P = pmin(room, ideal_delta_P)) %>%  # take lower
+  mutate(incen_room = predict(drc2, data.frame(x = actual_delta_P))) %>% 
+  # mutate(incen_funmodel = fun.model(actual_delta_P)) %>% 
+  mutate(p_incentives = pred + actual_delta_P) %>% 
+  mutate(incentives = trunc(pmin(ideal_incentive, incen_room))) %>% # take the lower value
   mutate(new_prob = fun.3(incentives) + pred) # sanity check
 
 head(testX, 10)
 ```
 
 
-### Imperfection  
-So, the caveat is that because my function approximations weren't perfect, if I calculate the percentage of improvement based on what I spent, I have some instances where it seems like I'm spending more than I should.  
-```{r}
-over1 <- testX %>% 
-  filter(new_prob >= 1) %>% # uh oh?
-  arrange(desc(new_prob))
 
-head(over1, 10)
-```
-
-There is no mechanism in place to detect or penalize for that (aside from lost revenue), so you could leave them as-is, or scale down the incentives by a certain percentage (seems to happen mostly when the premium is within a certain range).  I'll leave it to you to play with.  
-
-```{r}
-nrow(over1) / nrow(testCC)
-summary(over1$incentives)
-```
-  
-  
 ## Evaluation  
 **Of me:** I got distracted as the deadline approached, and never submitted for a final score.  I *had* made submissions that were on the top ~1/3 of the leaderboard before figuring out the optimization part.   
 **Of the platform** it's a dud for people coming to learn:  
   
-* doesn't automatically submit your best score   (why??)
+* doesn't automatically submit your best score  
 * the data, the problem decription, and solution checker are all taken down after the competition closes  (I thought perhaps because it was a problem used for hiring/interviews, but its the same for all past competitions)  
 * the ambiguity referenced earlier- there was actually a typo in the description of a variable, and the formulas given described increase in probability on a 0-100 scale. I'm sure most people caught it but just seems lazy.  
 * No clarification of said ambiguity offered during the hackathon despite a Slack channel dedicated to it, and people asking for clarification.
 
 
-A bit anti-climactic I suppose. **Lesson learned:  Stick to Kaggle if you're learning. **  I'm intentionally avoiding naming the problem and the platform until I get "permission."  
+A bit anti-climactic I suppose. **Lesson learned:  Stick to Kaggle if you're learning. **   
     
-If you have some optimization experience or math chops, I'd love to know the 'right' way to go about this problem, **so if you have an opinion or alternate strategy, even a link to a useful tutorial, please share!  **
+If you have some optimization experience or math chops, I'd love to know the 'right' way to go about this problem, **so if you have an opinion or alternate strategy, even a link to a useful tutorial, please share!  **  
 
 Here is some code to approximate your score on the test set (which is pretty easy to do, if you just use AUC on the training data)
 ```{r}
@@ -223,10 +209,10 @@ wi <- sum(
   (ifelse(testX$pred>=.9, 1, 0) )*testX$premium) # 328M
 
 # total possible revenue; sum of premiums
-all <- sum(testX$premium) # 370M
+all <- sum(testX$premium) # 371M
 
 # your revenue after incentives
-rev <- sum((testX$p_incentives*testX$premium)-testX$incentives) # 364M
+rev <- sum((testX$p_incentives*testX$premium)-testX$incentives) # 366M
 
 incent_score <- (rev-wi)/(all-wi); incent_score
 
