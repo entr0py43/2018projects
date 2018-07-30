@@ -11,6 +11,7 @@ output:
 ---
 ```{r, echo=F}
 knitr::opts_chunk$set(error = TRUE)
+options(scipen=999)
 ```
 
 Background:  Decided to participate in a short 'over the weekend' data science hackathon. No aspirations of placing, just learning.  What I'm presenting here is my interpretation of the question, and approach to the problem.  (Unfortunately, there was some ambiguity as to the actual structure of the problem*)  
@@ -186,6 +187,7 @@ head(testX, 10)
 Cool, check out line 8, where our new overall probability of renewal (`P_incentived`) is 0.9978. Is that just the error in our function approximations?  Nope, it's actually dictated by the ideal_incentive/ideal_delta_p, which is a hair less than what we have 'room' for (.125 vs .127). Neat, math is fun!   
 Line 7 on the other hand, started at ~.59 and had plenty of `room` -- but, since the policy amount was low (3300), so was the ideal_incentive, so he ends up with a new renewal probability of only ~.69.  
 
+
 ### Imperfection  
 So, the caveat is that because my function approximations weren't perfect, if I calculate the percentage of improvement based on what I spent, I have some instances where it seems like I'm spending more than I should.
 ```{r}
@@ -230,11 +232,11 @@ wi <- sum(
 all <- sum(testX$premium) # 371M
 
 # your revenue after incentives
-rev <- sum((testX$P_incentivized*testX$premium)-testX$incentives) # 366M
+rev <- sum((testX$P_incentivized*testX$premium)-testX$incentives) # 363M
 
 incent_score <- (rev-wi)/(all-wi); incent_score
 
-score = (.7 * auc) + .3*(incent_score); score
+score = (.7 * auc) + (.3 * incent_score); score
 ```
 Just a quick way to check your own ideas re: optimization.  You would do a test-train split if you wanted to have a better idea of out-of-bag performance of your binary classifier. 
 
