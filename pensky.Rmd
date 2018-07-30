@@ -176,15 +176,33 @@ testX <- testX %>%
   mutate(ideal_incentive = predict(drc, testCC[c('id','premium')])) %>% # optimum based on premium
   mutate(ideal_delta_P = fun.3(ideal_incentive)) %>% # delta_P for ideal incentive
   mutate(actual_delta_P = pmin(room, ideal_delta_P)) %>%  # take lower
-  mutate(p_incentives = pred + actual_delta_P) %>% 
+  mutate(P_incentivized = pred + actual_delta_P) %>% 
   mutate(incen_room = 10^(predict(drc2, data.frame(x = room)))) %>% # remember y was log10(y)
   mutate(incentives = pmin(ideal_incentive, incen_room)) %>% # take the lower value
-  mutate(new_prob = fun.3(incentives) + pred) # sanity check
+  mutate(check_prob = fun.3(incentives) + pred) # sanity check
 
 head(testX, 10)
 ```
-Cool, check out line 8, where out new overall probability of renewal (`p_incentives`) is 0.9978. Is that just the error in our function approximations?  Nope, it's actually dictated by the ideal_incentive/ideal_delta_p, which is a hair less than what we have 'room' for (.125 vs .127). Neat, math is fun!   
+Cool, check out line 8, where our new overall probability of renewal (`P_incentived`) is 0.9978. Is that just the error in our function approximations?  Nope, it's actually dictated by the ideal_incentive/ideal_delta_p, which is a hair less than what we have 'room' for (.125 vs .127). Neat, math is fun!   
 Line 7 on the other hand, started at ~.59 and had plenty of `room` -- but, since the policy amount was low (3300), so was the ideal_incentive, so he ends up with a new renewal probability of only ~.69.  
+
+### Imperfection  
+So, the caveat is that because my function approximations weren't perfect, if I calculate the percentage of improvement based on what I spent, I have some instances where it seems like I'm spending more than I should.
+```{r}
+over1 <- testX %>% 
+  filter(check_prob >= 1) %>% # uh oh?
+  arrange(desc(check_prob))
+
+head(over1, 10)
+```
+
+There is no mechanism in place to detect or penalize for that (aside from lost revenue), so you could leave them as-is, or scale down the incentives by a certain percentage (seems to happen mostly when the premium is within a certain range). I'll leave it to you to play with.
+
+```{r}
+nrow(over1) / nrow(testCC)
+summary(over1$incentives)
+summary(over1$check_prob)
+```
 
 
 ## Evaluation  
@@ -212,7 +230,7 @@ wi <- sum(
 all <- sum(testX$premium) # 371M
 
 # your revenue after incentives
-rev <- sum((testX$p_incentives*testX$premium)-testX$incentives) # 366M
+rev <- sum((testX$P_incentivized*testX$premium)-testX$incentives) # 366M
 
 incent_score <- (rev-wi)/(all-wi); incent_score
 
