@@ -11,7 +11,6 @@ autoplot(forecast(auto.arima(lynx), h = 20))
 class(lynx)
 attributes(lynx)
 ds <- as.numeric(time(lynx))
-ds <- as.Date(ds, format = '%Y')
 
 ds <- lubridate::ymd(ds, truncated = 2L)
 
